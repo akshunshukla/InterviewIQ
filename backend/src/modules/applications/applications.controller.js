@@ -2,6 +2,8 @@ import prisma from "../../config/db.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { AppError } from "../../utils/AppError.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
+import { uploadToS3 } from "../../utils/s3.js";
+
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse");
@@ -47,8 +49,18 @@ export const applyForJob = asyncHandler(async (req, res, next) => {
       jobId,
       applicantId,
       resume_text,
+      resumeFileUrl,
+      status: "PENDING",
+      interview: {
+        create: {
+          status: "SCHEDULED",
+        },
+      },
       // Note: In production, upload req.file.buffer to AWS S3 here
       // and save the S3 link to 'resumeFileUrl'.
+    },
+    include: {
+      interview: true, // We return the interview so the frontend gets the interviewId immediately
     },
   });
 
@@ -71,6 +83,7 @@ export const getJobApplications = asyncHandler(async (req, res, next) => {
     where: { jobId },
     include: {
       applicant: { select: { name: true, email: true } },
+      interview: { select: { id: true, status: true, score: true } },
     },
   });
 
