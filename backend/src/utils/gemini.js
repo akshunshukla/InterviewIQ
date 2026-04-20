@@ -45,3 +45,40 @@ export const generateInterviewResponse = async (
     throw new AppError("Failed to generate AI response", 500);
   }
 };
+
+export const generateInterviewReport = async (transcript, jobDescription) => {
+  try {
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      // Force the AI to output valid JSON
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.2, // Low temperature for more analytical/consistent grading
+      },
+      systemInstruction: `You are an expert technical recruiter evaluating an interview transcript for the following role: "${jobDescription}". 
+        Analyze the candidate's answers based on accuracy, communication, clarity, and problem-solving.
+        You MUST output a valid JSON object with the following exact keys and value types:
+        {
+          "tech_score": number (0-100),
+          "comm_score": number (0-100),
+          "problemSolvingScore": number (0-100),
+          "clarityScore": number (0-100),
+          "strengths": [array of short strings],
+          "weaknesses": [array of short strings],
+          "finalRecommendation": string (detailed paragraph of feedback),
+          "final_verdict": string (either "HIRE", "NO HIRE", or "NEEDS REVIEW")
+        }`,
+    });
+
+    const prompt = `Here is the interview transcript:\n${transcript}\n\nGenerate the evaluation JSON.`;
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+
+    // Parse the stringified JSON returned by Gemini into a JS Object
+    return JSON.parse(responseText);
+  } catch (error) {
+    console.error("Gemini Evaluation Error:", error);
+    throw new AppError("Failed to generate interview report from AI", 500);
+  }
+};
